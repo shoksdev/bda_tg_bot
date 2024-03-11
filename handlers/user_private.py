@@ -1,10 +1,13 @@
+import asyncio
+
 from aiogram import F, types, Router
 from aiogram.filters import CommandStart, Command
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.wildberries import get_info_about_product
-from database.orm_queries import orm_add_application, orm_get_applications
+from database.orm_queries import orm_add_application, orm_get_applications, orm_get_application
 from filters.chat_types import ChatTypeFilter
+from keyboards.inline import get_callback_btns
 from keyboards.reply import get_keyboard
 
 user_private_router = Router()
@@ -16,6 +19,12 @@ USER_KEYBOARD = get_keyboard(
     'Получить информацию из БД',
     placeholder="Выберите действие",
     sizes=(3,),
+)
+
+USER_INLINE = get_callback_btns(
+    btns={
+        "Подписаться": "subscribe",
+    }
 )
 
 
@@ -49,10 +58,17 @@ async def get_product_article(message: types.Message, session: AsyncSession):
     product_article = int(message.text)
     try:
         all_stocks_quantity, product_name, product_price, product_rating = get_info_about_product(product_article)
-        await message.answer(f'Название товара: {product_name}\nАртикул товара: {product_article}'
-                             f'\nЦена товара: {product_price} рублей\nРейтинг товара: {product_rating}'
-                             f'\nКоличество товара на всех складах: {all_stocks_quantity}')
-        await orm_add_application(session, message.from_user.id, product_article)
+        message_text = (f'Название товара: {product_name}\nАртикул товара: {product_article}\n'
+                        f'Цена товара: {product_price} рублей\nРейтинг товара: {product_rating}'
+                        f'\nКоличество товара на всех складах: {all_stocks_quantity}')
+        await message.answer(
+            message_text,
+            reply_markup=get_callback_btns(
+                btns={
+                    "Подписаться": f"subscribe_{product_article}",
+                }
+            ))
+        await orm_add_application(session, message.from_user.id, product_article, message_text)
     except IndexError:
         await message.answer('Такого товара нет, введите другой артикул!')
         return
@@ -61,3 +77,18 @@ async def get_product_article(message: types.Message, session: AsyncSession):
 @user_private_router.message(F.text != '/menu')
 async def get_product_article_exception_error(message: types.Message):
     await message.answer("Вы ввели недопустимые данные, введите артикул товара")
+
+
+@user_private_router.callback_query(F.data.startswith("subscribe"))
+async def subscribe_callback(callback: types.CallbackQuery, bot, session: AsyncSession):
+    product_article = int(callback.data.split("_")[-1])
+    user_id = callback.from_user.id
+    message_text = (await orm_get_application(session, user_id, product_article))[-1].message_for_mailing
+    await callback.answer("Вы успешно подписались на уведомления!")
+    await send_message_periodically(bot, user_id, message_text)
+
+
+async def send_message_periodically(bot, chat_id, message):
+    while True:
+        await bot.send_message(chat_id, message)
+        await asyncio.sleep(5)
