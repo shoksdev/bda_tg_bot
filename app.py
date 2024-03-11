@@ -2,6 +2,7 @@ import asyncio
 import os
 
 from aiogram import Bot, Dispatcher, types
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from dotenv import find_dotenv, load_dotenv
@@ -17,7 +18,7 @@ from handlers.user_private import user_private_router
 from commands.commands import private
 
 
-bot = Bot(token=os.getenv('TELEGRAM_TOKEN'), parse_mode=ParseMode.HTML)
+bot = Bot(token=os.getenv('TELEGRAM_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 dp = Dispatcher()
 dp.include_router(user_private_router)
