@@ -21,11 +21,7 @@ USER_KEYBOARD = get_keyboard(
     sizes=(3,),
 )
 
-USER_INLINE = get_callback_btns(
-    btns={
-        "Подписаться": "subscribe",
-    }
-)
+sending_message_to_user_states = {}
 
 
 @user_private_router.message(CommandStart())
@@ -39,22 +35,32 @@ async def menu_command(message: types.Message):
 
 
 @user_private_router.message(F.text == 'Получить информацию из БД')
-async def get_product_article(message: types.Message, session: AsyncSession):
+async def get_applications_from_database(message: types.Message, session: AsyncSession):
     applications = (await orm_get_applications(session))[:5]
     for application in applications:
         await message.answer(f'Артикул товара: {application.product_article}\nID пользователя: {application.user_id}'
                              f'\nДата и время создания: {application.created}')
 
 
+@user_private_router.message(F.text == "Остановить уведомления")
+async def stop_mailing(message: types.Message):
+    user_id = message.from_user.id
+    if sending_message_to_user_states.get(user_id, False):
+        await message.answer("Рассылка сообщений остановлена!")
+        sending_message_to_user_states[user_id] = False
+    else:
+        await message.answer("Рассылка сообщений уже остановлена!")
+
+
 @user_private_router.message(F.text == "Получить информацию по товару")
-async def get_product_article(message: types.Message):
+async def get_product_info_button(message: types.Message):
     await message.answer(
         "Введите артикул товара", reply_markup=types.ReplyKeyboardRemove()
     )
 
 
 @user_private_router.message(F.text.isdigit())
-async def get_product_article(message: types.Message, session: AsyncSession):
+async def get_product_info(message: types.Message, session: AsyncSession):
     product_article = int(message.text)
     try:
         all_stocks_quantity, product_name, product_price, product_rating = get_info_about_product(product_article)
@@ -75,20 +81,24 @@ async def get_product_article(message: types.Message, session: AsyncSession):
 
 
 @user_private_router.message(F.text != '/menu')
-async def get_product_article_exception_error(message: types.Message):
+async def get_product_info_exception_error(message: types.Message):
     await message.answer("Вы ввели недопустимые данные, введите артикул товара")
 
 
 @user_private_router.callback_query(F.data.startswith("subscribe"))
-async def subscribe_callback(callback: types.CallbackQuery, bot, session: AsyncSession):
+async def subscribe_on_mailing_callback(callback: types.CallbackQuery, bot, session: AsyncSession):
     product_article = int(callback.data.split("_")[-1])
     user_id = callback.from_user.id
-    message_text = (await orm_get_application(session, user_id, product_article))[-1].message_for_mailing
-    await callback.answer("Вы успешно подписались на уведомления!")
-    await send_message_periodically(bot, user_id, message_text)
+    if not sending_message_to_user_states.get(user_id, False):
+        sending_message_to_user_states[user_id] = True
+        message_text = (await orm_get_application(session, user_id, product_article))[-1].message_for_mailing
+        await callback.answer("Вы успешно подписались на рассылку уведомлений!")
+        await message_distribution(bot, user_id, message_text)
+    else:
+        await callback.message.answer('Рассылка сообщений уже запущена!')
 
 
-async def send_message_periodically(bot, chat_id, message):
-    while True:
-        await bot.send_message(chat_id, message)
+async def message_distribution(bot, user_id, message):
+    while sending_message_to_user_states.get(user_id, False):
+        await bot.send_message(user_id, message)
         await asyncio.sleep(5)
