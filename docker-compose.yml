@@ -1,0 +1,35 @@
+version: '3.7'
+
+
+services:
+  database:
+    container_name: database
+    image: postgres
+    env_file:
+       - .env
+    restart: always
+    ports:
+      - 5432:5432
+    networks:
+      - botnet
+    volumes:
+      - ./postgres:/var/lib/postgresql
+
+  tgbot:
+    container_name: bot
+    build:
+      context: .
+    command: python app.py
+    networks:
+      - botnet
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - .:/src
+    depends_on:
+      - database
+
+networks:
+  botnet:
+    driver: bridge
