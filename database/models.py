@@ -1,13 +1,17 @@
-from sqlalchemy import DateTime, Float, String, Text, func, Integer
+from sqlalchemy import DateTime, String, func, Integer
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
+    """Базовая модель"""
+
     created: Mapped[DateTime] = mapped_column(DateTime, default=func.now())
     updated: Mapped[DateTime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
 
 
 class Application(Base):
+    """Модель заявок, храним имя пользователя, артикул товара и сообщение, которое нужно вывести с рассылкой"""
+
     __tablename__ = 'application'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

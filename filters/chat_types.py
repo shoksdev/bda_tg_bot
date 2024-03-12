@@ -1,8 +1,10 @@
-from aiogram.filters import Filter
 from aiogram import types
+from aiogram.filters import Filter
 
 
 class ChatTypeFilter(Filter):
+    """Фильтруем типы чатов"""
+
     def __init__(self, chat_types: list[str]) -> None:
         self.chat_types = chat_types
 

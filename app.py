@@ -4,18 +4,16 @@ import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-
+from aiogram.types import BotCommand
 from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv())
 
-from middlewares.database_middleware import DataBaseSession
+from middlewares.database import DataBaseMiddleware
 
-from database.engine import create_db, drop_db, session_maker
+from database.engine import create_database, session_maker
 
-from handlers.user_private import user_private_router, send_message_periodically
-
-from commands.commands import private
+from handlers.user_private import user_private_router
 
 
 bot = Bot(token=os.getenv('TELEGRAM_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -23,18 +21,22 @@ bot = Bot(token=os.getenv('TELEGRAM_TOKEN'), default=DefaultBotProperties(parse_
 dp = Dispatcher()
 dp.include_router(user_private_router)
 
+# Создаём список команд для бота
+private = [
+    BotCommand(command='menu', description='Посмотреть меню'),
+]
 
 async def on_startup(bot):
+    """При запуске бота создаём базу данных"""
 
-    # await drop_db()
+    # await drop_database()
 
-    await create_db()
+    await create_database()
 
 
 async def main():
     dp.startup.register(on_startup)
-
-    dp.update.middleware(DataBaseSession(session_pool=session_maker))
+    dp.update.middleware(DataBaseMiddleware(session_pool=session_maker))
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_my_commands(commands=private, scope=types.BotCommandScopeAllPrivateChats())
     await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())

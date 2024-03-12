@@ -1,7 +1,12 @@
 import requests
 
 
-def get_info_about_product(product_article):
+def get_info_about_product(product_article: int):
+    """
+    Выполняем запрос к API card.wb.ru, получаем JSON и достаем из него название товара, цену и оценку,
+    а также считаем количество на всех складах
+    """
+
     request = requests.get(
         f'https://card.wb.ru/cards/v1/detail?appType=1&curr=rub&dest=-1257786&spp=30&nm={product_article}')
 
